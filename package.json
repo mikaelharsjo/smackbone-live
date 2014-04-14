@@ -1,0 +1,38 @@
+{
+	"name": "smackbone-live",
+	"version": "0.0.1",
+	"author": "Peter Bjorklund <piot@hotmail.com>",
+	"description": "an object oriented live model framework",
+	"keywords": [
+		"model",
+		"controller",
+		"event",
+		"server",
+		"client",
+		"browser",
+		"smackbone",
+		"websocket"
+	],
+	"dependencies": {
+		"requirejs": "",
+		"ws": ""
+	},
+	"scripts": {
+		"test": "grunt test"
+	},
+	"main": "./out/smackbone_live.js",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/piot/smackbone-live.git"
+	},
+	"devDependencies": {
+		"coffee-script": ">=1.6.0",
+		"mocha":  ">=1.14.0",
+		"should": ">=2.0.0",
+		"grunt": ">=0.4.0",
+		"grunt-mocha-test": ">=0.7.0",
+		"grunt-contrib-coffee": ">=0.7.0",
+		"grunt-contrib-concat": ">=0.3.0"
+	},
+	"license": "MIT"
+}
