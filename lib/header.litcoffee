@@ -2,7 +2,7 @@
 	if exports?
 		console.log 'exports is here'
 		SmackboneLive = exports
-		Smackbone = require 'smackbone_live'
+		Smackbone = require 'smackbone'
 	else
 		console.log 'exports is not'
 		console.log 'root', this

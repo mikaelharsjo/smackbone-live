@@ -1,6 +1,6 @@
 {
 	"name": "smackbone-live",
-	"version": "0.0.1",
+	"version": "0.0.9",
 	"author": "Peter Bjorklund <piot@hotmail.com>",
 	"description": "an object oriented live model framework",
 	"keywords": [
@@ -15,12 +15,16 @@
 	],
 	"dependencies": {
 		"requirejs": "",
-		"ws": ""
+		"ws": "",
+		"smackbone":""
 	},
 	"scripts": {
 		"test": "grunt test"
 	},
-	"main": "./out/smackbone_live.js",
+	"main": "./out/smackbone-live.js",
+	"files": [
+		"out/smackbone-live.js"
+	],
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/piot/smackbone-live.git"

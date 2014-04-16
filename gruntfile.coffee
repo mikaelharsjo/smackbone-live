@@ -18,14 +18,15 @@ module.exports = (grunt) ->
 			dist:
 				src: [
 					'lib/header.litcoffee'
-					'lib/client/client_connection.litcoffee'
+					'lib/common/connection.litcoffee'
+					'lib/websocket/connection.litcoffee'
 				]
-				dest: 'out/smackbone_live.litcoffee'
+				dest: 'out/smackbone-live.litcoffee'
 
 		coffee:
 			compile:
 				files:
-					'out/smackbone_live.js': 'out/smackbone_live.litcoffee'
+					'out/smackbone-live.js': 'out/smackbone-live.litcoffee'
 
 	grunt.registerTask 'test', [
 		'concat'
