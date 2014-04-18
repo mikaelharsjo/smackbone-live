@@ -5,18 +5,24 @@
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
 
   if (typeof exports !== "undefined" && exports !== null) {
-    console.log('exports is here');
     SmackboneLive = exports;
     Smackbone = require('smackbone');
   } else {
-    console.log('exports is not');
-    console.log('root', this);
     SmackboneLive = this.SmackboneLive = {};
     Smackbone = this.Smackbone;
   }
 
   SmackboneLive.Connection = (function(_super) {
+    var ReadyState;
+
     __extends(Connection, _super);
+
+    ReadyState = {
+      Connecting: 0,
+      Open: 1,
+      Closing: 2,
+      Closed: 3
+    };
 
     function Connection(connection, repository) {
       this.connection = connection;
@@ -28,12 +34,46 @@
       this._onSaveRequest = __bind(this._onSaveRequest, this);
       this.messageQueue = {};
       this.messageId = 0;
-      this.repository.on('save_request', this._onSaveRequest);
       this.connection.on('message', this._onMessage);
-      this.connection.on('connect', this._onConnect);
-      this.connection.on('disconnect', this._onDisconnect);
+      this.connection.on('open', this._onConnect);
+      this.connection.on('close', this._onDisconnect);
       this.connection.on('error', this._onError);
+      this._sendRoot();
+      this._listen();
     }
+
+    Connection.prototype._sendModel = function(path, model) {
+      return this._send({
+        url: path,
+        data: model,
+        type: 'save'
+      });
+    };
+
+    Connection.prototype._sendRoot = function() {
+      return this._sendModel('', this.repository);
+    };
+
+    Connection.prototype._listen = function() {
+      return this.repository.on('save_request', this._onSaveRequest);
+    };
+
+    Connection.prototype._stopListen = function() {
+      return this.repository.off('save_request', this._onSaveRequest);
+    };
+
+    Connection.prototype.close = function() {
+      this._stopListen();
+      this.connection.off('message', this._onMessage);
+      this.connection.off('open', this._onConnect);
+      this.connection.off('close', this._onDisconnect);
+      this.connection.off('error', this._onError);
+      return this.isClosed = true;
+    };
+
+    Connection.prototype.isConnected = function() {
+      return this.connection.readyState === ReadyState.Open;
+    };
 
     Connection.prototype.setCommandReceiver = function(commandReceiver) {
       this.commandReceiver = commandReceiver;
@@ -41,7 +81,6 @@
 
     Connection.prototype.command = function(url, data, done) {
       var queueItem;
-      console.log('Connection:Command ', url, data);
       this.messageId += 1;
       this._send({
         type: 'command',
@@ -57,7 +96,6 @@
 
     Connection.prototype.model = function(url) {
       var model;
-      console.log(this.repository, url);
       model = this.repository.get(url);
       if (model == null) {
         model = new Smackbone.Model;
@@ -78,18 +116,16 @@
 
     Connection.prototype._send = function(object) {
       var string;
-      console.log('Connection: Sending:', object);
-      string = JSON.stringify(object);
-      return this.connection.send(string);
+      if (this.isConnected()) {
+        string = JSON.stringify(object);
+        return this.connection.send(string);
+      } else {
+        return console.log("Couldn't send. Connection is not open:", object);
+      }
     };
 
     Connection.prototype._onSaveRequest = function(path, model) {
-      console.log('Connection: save request', path);
-      return this._send({
-        url: path,
-        data: model,
-        type: 'save'
-      });
+      return this._sendModel(path, model);
     };
 
     Connection.prototype._onReply = function(messageId, err, data) {
@@ -106,7 +142,6 @@
     Connection.prototype._onMessage = function(event) {
       var functionName, method, model, object;
       object = JSON.parse(event);
-      console.log('Connection: Message:', object);
       if (object.reply_to != null) {
         return this._onReply(object.reply_to, object.err, object.data);
       } else {
@@ -134,17 +169,16 @@
     };
 
     Connection.prototype._onConnect = function(event) {
-      console.log('Connection: connected to:', event);
+      this._listen();
       return this.trigger('connect', this);
     };
 
     Connection.prototype._onDisconnect = function(event) {
-      console.log('Connection: disconnected:', event);
+      this._stopListen();
       return this.trigger('disconnect', this);
     };
 
     Connection.prototype._onError = function(error) {
-      console.log('Connection: we have a error:', error);
       return this.trigger('error', this);
     };
 
@@ -165,6 +199,7 @@
 
     WebsocketConnection.prototype.connect = function() {
       var connection;
+      this.readyState = 0;
       connection = new WebSocket(this.host);
       connection.onopen = this._onOpen;
       connection.onclose = this._onClose;
@@ -182,13 +217,13 @@
     };
 
     WebsocketConnection.prototype._onOpen = function(event) {
-      console.log('connected to:', event);
-      return this.trigger('connect', this);
+      this.readyState = 1;
+      return this.trigger('open', this);
     };
 
     WebsocketConnection.prototype._onClose = function(event) {
-      console.log('disconnected:', event);
-      return this.trigger('disconnect', this);
+      this.readyState = 2;
+      return this.trigger('close', this);
     };
 
     WebsocketConnection.prototype._onError = function(error) {

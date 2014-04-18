@@ -3,6 +3,7 @@
 		constructor: (@host) ->
 
 		connect: ->
+			@readyState = 0
 			connection = new WebSocket @host
 			connection.onopen = @_onOpen
 			connection.onclose = @_onClose
@@ -17,12 +18,12 @@
 			@trigger 'message', event.data
 
 		_onOpen: (event) =>
-			console.log 'connected to:', event
-			@trigger 'connect', this
+			@readyState = 1
+			@trigger 'open', this
 
 		_onClose: (event) =>
-			console.log 'disconnected:', event
-			@trigger 'disconnect', this
+			@readyState = 2
+			@trigger 'close', this
 
 		_onError: (error) =>
 			console.log 'we have a error:', error
