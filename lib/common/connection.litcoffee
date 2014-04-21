@@ -16,14 +16,16 @@
 			@connection.on 'close', @_onDisconnect
 			@connection.on 'error', @_onError
 
-			@_sendRoot()
-			@_listen()
-
 		_sendModel: (path, model) ->
 			@_send
 				url: path
 				data: model
 				type: 'save'
+
+		sendRepositoryChanges: ->
+			@_sendRoot()
+			@_listen()
+
 
 		_sendRoot: ->
 			@_sendModel '', @repository

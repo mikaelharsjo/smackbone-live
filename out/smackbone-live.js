@@ -38,8 +38,6 @@
       this.connection.on('open', this._onConnect);
       this.connection.on('close', this._onDisconnect);
       this.connection.on('error', this._onError);
-      this._sendRoot();
-      this._listen();
     }
 
     Connection.prototype._sendModel = function(path, model) {
@@ -48,6 +46,11 @@
         data: model,
         type: 'save'
       });
+    };
+
+    Connection.prototype.sendRepositoryChanges = function() {
+      this._sendRoot();
+      return this._listen();
     };
 
     Connection.prototype._sendRoot = function() {
