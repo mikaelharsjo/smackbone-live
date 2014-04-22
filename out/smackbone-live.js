@@ -24,24 +24,28 @@
       Closed: 3
     };
 
-    function Connection(connection, repository) {
+    function Connection(connection, repository, local) {
       this.connection = connection;
       this.repository = repository;
+      this.local = local;
       this._onError = __bind(this._onError, this);
       this._onDisconnect = __bind(this._onDisconnect, this);
       this._onConnect = __bind(this._onConnect, this);
       this._onMessage = __bind(this._onMessage, this);
+      this._onLocalSaveRequest = __bind(this._onLocalSaveRequest, this);
       this._onSaveRequest = __bind(this._onSaveRequest, this);
       this.messageQueue = {};
       this.messageId = 0;
+      this.local.on('save_request', this._onLocalSaveRequest);
       this.connection.on('message', this._onMessage);
       this.connection.on('open', this._onConnect);
       this.connection.on('close', this._onDisconnect);
       this.connection.on('error', this._onError);
     }
 
-    Connection.prototype._sendModel = function(path, model) {
+    Connection.prototype._sendModel = function(domain, path, model) {
       return this._send({
+        domain: domain,
         url: path,
         data: model,
         type: 'save'
@@ -54,7 +58,7 @@
     };
 
     Connection.prototype._sendRoot = function() {
-      return this._sendModel('', this.repository);
+      return this._sendModel('', '', this.repository);
     };
 
     Connection.prototype._listen = function() {
@@ -67,6 +71,7 @@
 
     Connection.prototype.close = function() {
       this._stopListen();
+      this.local.off('save_request', this._onLocalSaveRequest);
       this.connection.off('message', this._onMessage);
       this.connection.off('open', this._onConnect);
       this.connection.off('close', this._onDisconnect);
@@ -121,6 +126,7 @@
       var string;
       if (this.isConnected()) {
         string = JSON.stringify(object);
+        console.log('send:', string);
         return this.connection.send(string);
       } else {
         return console.log("Couldn't send. Connection is not open:", object);
@@ -128,7 +134,11 @@
     };
 
     Connection.prototype._onSaveRequest = function(path, model) {
-      return this._sendModel(path, model);
+      return this._sendModel('', path, model);
+    };
+
+    Connection.prototype._onLocalSaveRequest = function(path, model) {
+      return this._sendModel('local', path, model);
     };
 
     Connection.prototype._onReply = function(messageId, err, data) {
@@ -143,14 +153,16 @@
     };
 
     Connection.prototype._onMessage = function(event) {
-      var functionName, method, model, object;
+      var domain, functionName, method, model, object;
+      console.log('receive:', event);
       object = JSON.parse(event);
       if (object.reply_to != null) {
         return this._onReply(object.reply_to, object.err, object.data);
       } else {
         switch (object.type) {
           case 'save':
-            model = object.url === '' ? this.repository : this.repository.get(object.url);
+            domain = object.domain === 'local' ? this.local : this.repository;
+            model = object.url === '' ? domain : domain.get(object.url);
             return model != null ? model.set(object.data) : void 0;
           case 'command':
             functionName = "_" + object.url;

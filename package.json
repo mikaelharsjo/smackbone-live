@@ -1,6 +1,6 @@
 {
 	"name": "smackbone-live",
-	"version": "0.1.3",
+	"version": "0.1.7",
 	"author": "Peter Bjorklund <piot@hotmail.com>",
 	"description": "an object oriented live model framework",
 	"keywords": [
