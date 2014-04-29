@@ -72,10 +72,7 @@
     Connection.prototype.close = function() {
       this._stopListen();
       this.local.off('save_request', this._onLocalSaveRequest);
-      this.connection.off('message', this._onMessage);
-      this.connection.off('open', this._onConnect);
-      this.connection.off('close', this._onDisconnect);
-      this.connection.off('error', this._onError);
+      this.connection.close();
       return this.isClosed = true;
     };
 
@@ -172,7 +169,10 @@
             if (method != null) {
               return method.call(this.commandReceiver, object.data, (function(_this) {
                 return function(err, reply) {
-                  return _this._sendReply(object.message_id, err, reply);
+                  _this._sendReply(object.message_id, err, reply);
+                  if ((err != null ? err.status : void 0) < 0) {
+                    return _this.close();
+                  }
                 };
               })(this));
             } else {

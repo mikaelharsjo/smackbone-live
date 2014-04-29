@@ -42,10 +42,7 @@
 		close: ->
 			@_stopListen()
 			@local.off 'save_request', @_onLocalSaveRequest
-			@connection.off 'message', @_onMessage
-			@connection.off 'open', @_onConnect
-			@connection.off 'close', @_onDisconnect
-			@connection.off 'error', @_onError
+			@connection.close()
 			@isClosed = true
 
 		isConnected: ->
@@ -116,13 +113,14 @@
 						model = if object.url is '' then domain else domain.get(object.url)
 						model?.set object.data,
 							triggerRemove: true
-
 					when 'command'
 						functionName = "_#{object.url}"
 						method = @commandReceiver[functionName]
 						if method?
 							method.call @commandReceiver, object.data, (err, reply) =>
 								@_sendReply object.message_id, err, reply
+								if err?.status < 0
+									@close()
 						else
 							console.log "Unknown function '#{functionName}'"
 					else
