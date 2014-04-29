@@ -114,7 +114,9 @@
 					when 'save'
 						domain = if object.domain is 'local' then @local else @repository
 						model = if object.url is '' then domain else domain.get(object.url)
-						model?.set object.data
+						model?.set object.data,
+							triggerRemove: true
+
 					when 'command'
 						functionName = "_#{object.url}"
 						method = @commandReceiver[functionName]

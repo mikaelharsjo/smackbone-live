@@ -163,7 +163,9 @@
           case 'save':
             domain = object.domain === 'local' ? this.local : this.repository;
             model = object.url === '' ? domain : domain.get(object.url);
-            return model != null ? model.set(object.data) : void 0;
+            return model != null ? model.set(object.data, {
+              triggerRemove: true
+            }) : void 0;
           case 'command':
             functionName = "_" + object.url;
             method = this.commandReceiver[functionName];
