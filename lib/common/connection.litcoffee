@@ -82,10 +82,9 @@
 		_send: (object) ->
 			if @isConnected()
 				string = JSON.stringify object
-				console.log 'send:', string
 				@connection.send string
 			else
-				console.log "Couldn't send. Connection is not open:", object
+				console.warn "Couldn't send. Connection is not open:", object
 
 		_onSaveRequest: (path, model) =>
 			@_sendModel '', path, model
@@ -96,13 +95,12 @@
 		_onReply: (messageId, err, data) ->
 			message = @messageQueue[messageId]
 			if not message?
-				console.log "Got confirmation on unknown message #{messageId}"
+				console.warn "Got confirmation on unknown message #{messageId}"
 			else
 				message.callback err, data
 				delete @messageQueue[messageId]
 
 		_onMessage: (event) =>
-			console.log 'receive:', event
 			object = JSON.parse event
 			if object.reply_to?
 				@_onReply object.reply_to, object.err, object.data
@@ -122,7 +120,7 @@
 								if err?.status < 0
 									@close()
 						else
-							console.log "Unknown function '#{functionName}'"
+							console.warn "Unknown function '#{functionName}'"
 					else
 						@trigger 'message', object.data, this
 

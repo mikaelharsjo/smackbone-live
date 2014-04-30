@@ -26,5 +26,5 @@
 			@trigger 'close', this
 
 		_onError: (error) =>
-			console.log 'we have a error:', error
+			console.error 'we have a error:', error
 			@trigger 'error', this

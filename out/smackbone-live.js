@@ -123,10 +123,9 @@
       var string;
       if (this.isConnected()) {
         string = JSON.stringify(object);
-        console.log('send:', string);
         return this.connection.send(string);
       } else {
-        return console.log("Couldn't send. Connection is not open:", object);
+        return console.warn("Couldn't send. Connection is not open:", object);
       }
     };
 
@@ -142,7 +141,7 @@
       var message;
       message = this.messageQueue[messageId];
       if (message == null) {
-        return console.log("Got confirmation on unknown message " + messageId);
+        return console.warn("Got confirmation on unknown message " + messageId);
       } else {
         message.callback(err, data);
         return delete this.messageQueue[messageId];
@@ -151,7 +150,6 @@
 
     Connection.prototype._onMessage = function(event) {
       var domain, functionName, method, model, object;
-      console.log('receive:', event);
       object = JSON.parse(event);
       if (object.reply_to != null) {
         return this._onReply(object.reply_to, object.err, object.data);
@@ -176,7 +174,7 @@
                 };
               })(this));
             } else {
-              return console.log("Unknown function '" + functionName + "'");
+              return console.warn("Unknown function '" + functionName + "'");
             }
             break;
           default:
@@ -244,7 +242,7 @@
     };
 
     WebsocketConnection.prototype._onError = function(error) {
-      console.log('we have a error:', error);
+      console.error('we have a error:', error);
       return this.trigger('error', this);
     };
 
