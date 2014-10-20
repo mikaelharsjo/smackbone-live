@@ -24,31 +24,47 @@
       Closed: 3
     };
 
-    function Connection(connection, repository, local) {
-      this.connection = connection;
-      this.repository = repository;
-      this.local = local;
+    function Connection(options, done) {
       this._onError = __bind(this._onError, this);
       this._onDisconnect = __bind(this._onDisconnect, this);
       this._onConnect = __bind(this._onConnect, this);
       this._onMessage = __bind(this._onMessage, this);
+      this._onObject = __bind(this._onObject, this);
       this._onLocalSaveRequest = __bind(this._onLocalSaveRequest, this);
       this._onSaveRequest = __bind(this._onSaveRequest, this);
+      this.connection = options.connection;
+      this.repository = options.repository;
+      this.commandReceiver = options.commandReceiver;
+      this.local = options.local;
+      this.listenToEvent = options.listenToEvent;
+      if (this.listenToEvent != null) {
+        this.listenToEvent.on('all', this._onAll);
+      }
       this.messageQueue = {};
       this.messageId = 0;
       this.local.on('save_request', this._onLocalSaveRequest);
       this.connection.on('message', this._onMessage);
+      this.connection.on('object', this._onObject);
       this.connection.on('open', this._onConnect);
       this.connection.on('close', this._onDisconnect);
       this.connection.on('error', this._onError);
+      done(null, this);
     }
+
+    Connection.prototype._onAll = function(url, data) {
+      return this._send({
+        type: 'event',
+        url: url,
+        data: data
+      });
+    };
 
     Connection.prototype._sendModel = function(domain, path, model) {
       return this._send({
-        domain: domain,
+        type: 'save',
         url: path,
         data: model,
-        type: 'save'
+        domain: domain
       });
     };
 
@@ -66,7 +82,9 @@
     };
 
     Connection.prototype._stopListen = function() {
-      return this.repository.off('save_request', this._onSaveRequest);
+      var _ref;
+      this.repository.off('save_request', this._onSaveRequest);
+      return (_ref = this.listenToEvent) != null ? _ref.off('all', this._onAll) : void 0;
     };
 
     Connection.prototype.close = function() {
@@ -87,16 +105,16 @@
     Connection.prototype.command = function(url, data, done) {
       var queueItem;
       this.messageId += 1;
-      this._send({
-        type: 'command',
-        message_id: this.messageId,
-        url: url,
-        data: data
-      });
       queueItem = {
         callback: done
       };
-      return this.messageQueue[this.messageId] = queueItem;
+      this.messageQueue[this.messageId] = queueItem;
+      return this._send({
+        type: 'command',
+        messageId: this.messageId,
+        url: url,
+        data: data
+      });
     };
 
     Connection.prototype.model = function(url) {
@@ -148,39 +166,52 @@
       }
     };
 
-    Connection.prototype._onMessage = function(event) {
-      var domain, functionName, method, model, object;
-      object = JSON.parse(event);
+    Connection.prototype._onSave = function(object) {
+      var domain, model;
+      domain = object.domain === 'local' ? this.local : this.repository;
+      model = object.url === '' ? domain : domain.get(object.url);
+      return model != null ? model.set(object.data, {
+        triggerRemove: true
+      }) : void 0;
+    };
+
+    Connection.prototype._onCommand = function(object) {
+      var functionName, method;
+      functionName = "_" + object.url;
+      method = this.commandReceiver[functionName];
+      if (method != null) {
+        return method.call(this.commandReceiver, object.data, (function(_this) {
+          return function(err, reply) {
+            _this._sendReply(object.message_id, err, reply);
+            if ((err != null ? err.status : void 0) < 0) {
+              return _this.close();
+            }
+          };
+        })(this));
+      } else {
+        return console.warn("Unknown function '" + functionName + "'");
+      }
+    };
+
+    Connection.prototype._onObject = function(object) {
       if (object.reply_to != null) {
         return this._onReply(object.reply_to, object.err, object.data);
       } else {
         switch (object.type) {
           case 'save':
-            domain = object.domain === 'local' ? this.local : this.repository;
-            model = object.url === '' ? domain : domain.get(object.url);
-            return model != null ? model.set(object.data, {
-              triggerRemove: true
-            }) : void 0;
+            return this._onSave(object);
           case 'command':
-            functionName = "_" + object.url;
-            method = this.commandReceiver[functionName];
-            if (method != null) {
-              return method.call(this.commandReceiver, object.data, (function(_this) {
-                return function(err, reply) {
-                  _this._sendReply(object.message_id, err, reply);
-                  if ((err != null ? err.status : void 0) < 0) {
-                    return _this.close();
-                  }
-                };
-              })(this));
-            } else {
-              return console.warn("Unknown function '" + functionName + "'");
-            }
-            break;
-          default:
-            return this.trigger('message', object.data, this);
+            return this._onCommand(object);
+          case 'event':
+            return this.trigger(object.url, object.data, this);
         }
       }
+    };
+
+    Connection.prototype._onMessage = function(event) {
+      var object;
+      object = JSON.parse(event);
+      return this._onObject(object);
     };
 
     Connection.prototype._onConnect = function(event) {
