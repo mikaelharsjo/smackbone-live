@@ -1,0 +1,28 @@
+{
+  "name": "smackbone-live",
+  "version": "0.1.10",
+  "homepage": "https://github.com/Piot/smackbone-live",
+  "authors": [
+    "Peter Bjorklund <piot@hotmail.com>"
+  ],
+  "description": "an object oriented live model framework",
+  "main": "./out/smackbone-live.js",
+  "keywords": [
+    "model",
+    "controller",
+    "event",
+    "server",
+    "client",
+    "browser",
+    "smackbone",
+    "websocket"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ]
+}
