@@ -16,6 +16,7 @@
 		constructor: (options, done) ->
 			@connection = options.connection
 			@repository = options.repository
+			@log = options.log
 			@commandReceiver = options.commandReceiver
 			@local = options.local
 			@listenToEvent = options.listenToEvent
@@ -101,6 +102,7 @@
 
 		_send: (object) ->
 			if @isConnected()
+				@log?.log 'Smackbone Live: Send:', object
 				string = JSON.stringify object
 				@connection.send string
 			else
@@ -138,6 +140,7 @@
 				console.warn "Unknown function '#{functionName}'"
 
 		_onObject: (object) =>
+			@log?.log 'Smackbone Live: Incoming:', object
 			if object.reply_to?
 				@_onReply object.reply_to, object.err, object.data
 			else
@@ -154,14 +157,17 @@
 			@_onObject object
 
 		_onConnect: (event) =>
+			@log?.log 'Smackbone Live: Connected'
 			@_listen()
 			@trigger 'connect', this
 
 		_onDisconnect: (event) =>
+			@log?.log 'Smackbone Live: Disconnected'
 			@_stopListen()
 			@trigger 'disconnect', this
 
 		_onError: (error) =>
+			@log?.warn 'Smackbone Live: Error:', error
 			@trigger 'error', this
 
 	class SmackboneLive.WebsocketConnection extends Smackbone.Event

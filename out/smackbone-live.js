@@ -1,8 +1,8 @@
 (function() {
   var Smackbone, SmackboneLive,
-    __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
-    __hasProp = {}.hasOwnProperty,
-    __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
+    bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
+    extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
+    hasProp = {}.hasOwnProperty;
 
   if (typeof exports !== "undefined" && exports !== null) {
     SmackboneLive = exports;
@@ -12,10 +12,10 @@
     Smackbone = this.Smackbone;
   }
 
-  SmackboneLive.Connection = (function(_super) {
+  SmackboneLive.Connection = (function(superClass) {
     var ReadyState;
 
-    __extends(Connection, _super);
+    extend(Connection, superClass);
 
     ReadyState = {
       Connecting: 0,
@@ -25,15 +25,16 @@
     };
 
     function Connection(options, done) {
-      this._onError = __bind(this._onError, this);
-      this._onDisconnect = __bind(this._onDisconnect, this);
-      this._onConnect = __bind(this._onConnect, this);
-      this._onMessage = __bind(this._onMessage, this);
-      this._onObject = __bind(this._onObject, this);
-      this._onLocalSaveRequest = __bind(this._onLocalSaveRequest, this);
-      this._onSaveRequest = __bind(this._onSaveRequest, this);
+      this._onError = bind(this._onError, this);
+      this._onDisconnect = bind(this._onDisconnect, this);
+      this._onConnect = bind(this._onConnect, this);
+      this._onMessage = bind(this._onMessage, this);
+      this._onObject = bind(this._onObject, this);
+      this._onLocalSaveRequest = bind(this._onLocalSaveRequest, this);
+      this._onSaveRequest = bind(this._onSaveRequest, this);
       this.connection = options.connection;
       this.repository = options.repository;
+      this.log = options.log;
       this.commandReceiver = options.commandReceiver;
       this.local = options.local;
       this.listenToEvent = options.listenToEvent;
@@ -82,9 +83,9 @@
     };
 
     Connection.prototype._stopListen = function() {
-      var _ref;
+      var ref;
       this.repository.off('save_request', this._onSaveRequest);
-      return (_ref = this.listenToEvent) != null ? _ref.off('all', this._onAll) : void 0;
+      return (ref = this.listenToEvent) != null ? ref.off('all', this._onAll) : void 0;
     };
 
     Connection.prototype.close = function() {
@@ -138,8 +139,11 @@
     };
 
     Connection.prototype._send = function(object) {
-      var string;
+      var ref, string;
       if (this.isConnected()) {
+        if ((ref = this.log) != null) {
+          ref.log('Smackbone Live: Send:', object);
+        }
         string = JSON.stringify(object);
         return this.connection.send(string);
       } else {
@@ -194,6 +198,10 @@
     };
 
     Connection.prototype._onObject = function(object) {
+      var ref;
+      if ((ref = this.log) != null) {
+        ref.log('Smackbone Live: Incoming:', object);
+      }
       if (object.reply_to != null) {
         return this._onReply(object.reply_to, object.err, object.data);
       } else {
@@ -215,16 +223,28 @@
     };
 
     Connection.prototype._onConnect = function(event) {
+      var ref;
+      if ((ref = this.log) != null) {
+        ref.log('Smackbone Live: Connected');
+      }
       this._listen();
       return this.trigger('connect', this);
     };
 
     Connection.prototype._onDisconnect = function(event) {
+      var ref;
+      if ((ref = this.log) != null) {
+        ref.log('Smackbone Live: Disconnected');
+      }
       this._stopListen();
       return this.trigger('disconnect', this);
     };
 
     Connection.prototype._onError = function(error) {
+      var ref;
+      if ((ref = this.log) != null) {
+        ref.warn('Smackbone Live: Error:', error);
+      }
       return this.trigger('error', this);
     };
 
@@ -232,15 +252,15 @@
 
   })(Smackbone.Event);
 
-  SmackboneLive.WebsocketConnection = (function(_super) {
-    __extends(WebsocketConnection, _super);
+  SmackboneLive.WebsocketConnection = (function(superClass) {
+    extend(WebsocketConnection, superClass);
 
     function WebsocketConnection(host) {
       this.host = host;
-      this._onError = __bind(this._onError, this);
-      this._onClose = __bind(this._onClose, this);
-      this._onOpen = __bind(this._onOpen, this);
-      this._onMessage = __bind(this._onMessage, this);
+      this._onError = bind(this._onError, this);
+      this._onClose = bind(this._onClose, this);
+      this._onOpen = bind(this._onOpen, this);
+      this._onMessage = bind(this._onMessage, this);
     }
 
     WebsocketConnection.prototype.connect = function() {
