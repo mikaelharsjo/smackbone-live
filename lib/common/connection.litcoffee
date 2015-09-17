@@ -7,6 +7,9 @@
 			Closed: 3
 
 		constructor: (options, done) ->
+			@jsonrpc = new SmackboneLive.JsonRpc
+				target: @
+				log: options.log
 			@connection = options.connection
 			@repository = options.repository
 			@log = options.log
@@ -15,8 +18,6 @@
 			@listenToEvent = options.listenToEvent
 			if @listenToEvent?
 				@listenToEvent.on 'all', @_onAll
-			@messageQueue = {}
-			@messageId = 0
 
 			@local.on 'save_request', @_onLocalSaveRequest
 
@@ -28,17 +29,21 @@
 			done null, @
 
 		_onAll: (url, data) ->
-			@_send
-				type: 'event'
+			data =
 				url: url
 				data: data
 
+			@jsonrpc.sendNotification 'smackbone.event', data
+
 		_sendModel: (domain, path, model) ->
-			@_send
-				type: 'save'
+			data =
 				url: path
 				data: model
 				domain: domain
+
+			@jsonrpc.sendRequest 'smackbone.save', data, (err) ->
+				if err?
+					@log?.warn 'Smackbone-Live: Save returned error:', data
 
 		sendRepositoryChanges: ->
 			@_sendRoot()
@@ -65,19 +70,8 @@
 
 		setCommandReceiver: (@commandReceiver) ->
 
-		command: (url, data, done) ->
-			@messageId += 1
-
-			queueItem =
-				callback: done
-
-			@messageQueue[@messageId] = queueItem
-
-			@_send
-				type: 'command'
-				messageId: @messageId
-				url: url
-				data: data
+		command: (url, params, done) ->
+			@jsonrpc.sendRequest url, params, done
 
 		model: (url) ->
 			model = @repository.get url
@@ -86,68 +80,34 @@
 				@repository.set url, model
 			model
 
-		_sendReply: (messageId, err, data) ->
-			reply =
-				err: err
-				reply_to: messageId
-				data: data
-			@_send reply
-
-		_send: (object) ->
-			if @isConnected()
-				@log?.log 'Smackbone Live: Send:', object
-				string = JSON.stringify object
-				@connection.send string
-			else
-				console.warn "Couldn't send. Connection is not open:", object
-
 		_onSaveRequest: (path, model) =>
 			@_sendModel '', path, model
 
 		_onLocalSaveRequest: (path, model) =>
 			@_sendModel 'local', path, model
 
-		_onReply: (messageId, err, data) ->
-			message = @messageQueue[messageId]
-			if not message?
-				console.warn "Got confirmation on unknown message #{messageId}"
-			else
-				message.callback err, data
-				delete @messageQueue[messageId]
-
-		_onSave: (object) ->
+		_onSave: (object, done) ->
 			domain = if object.domain is 'local' then @local else @repository
 			model = if object.url is '' then domain else domain.get object.url
 			model?.set object.data,
 				triggerRemove: true
+			done null
 
-		_onCommand: (object) ->
-			functionName = "_#{object.url}"
+		_callMethod: (functionName, params, done) ->
 			method = @commandReceiver[functionName]
 			if method?
-				method.call @commandReceiver, object.data, (err, reply) =>
-					@_sendReply object.message_id, err, reply
-					if err?.status < 0
-						@close()
+				method.call @commandReceiver, params, done
 			else
-				console.warn "Unknown function '#{functionName}'"
-
-		_onObject: (object) =>
-			@log?.log 'Smackbone Live: Incoming:', object
-			if object.reply_to?
-				@_onReply object.reply_to, object.err, object.data
-			else
-				switch object.type
-					when 'save'
-						@_onSave object
-					when 'command'
-						@_onCommand object
-					when 'event'
-						@trigger object.url, object.data, this
+				errorMessage = "Unknown function '#{functionName}'"
+				@log?.warn errorMessage
+				done new Error errorMessage
 
 		_onMessage: (event) =>
 			object = JSON.parse event
-			@_onObject object
+			@jsonrpc.onObject object
+
+		_onObject: (object) =>
+			@jsonrpc.onObject object
 
 		_onConnect: (event) =>
 			@log?.log 'Smackbone Live: Connected'
@@ -162,3 +122,37 @@
 		_onError: (error) =>
 			@log?.warn 'Smackbone Live: Error:', error
 			@trigger 'error', this
+
+		_onNormalRequest: (method, params, done) ->
+			functionName = "_#{object.url}"
+			@_callMethod functionName, object.data, (err, result) ->
+				done err, result
+				if err?.status < 0
+					@close()
+
+		_send: (object) ->
+			if @isConnected()
+				@log?.log 'Smackbone Live: Send:', object
+				string = JSON.stringify object
+				@connection.send string
+			else
+				@log?.warn "Smackbone Live: Couldn't send. Connection is not open:", object
+
+JsonRpc 2.0 Handlers
+
+		_onRequest: (method, params, done) ->
+			@log?.log 'Smackbone Live: request:', method, params
+			switch method
+				when 'smackbone.save'
+					@_onSave params, done
+				else
+					@_onNormalRequest method, params, done
+
+		_onNotification: (method, params) ->
+			@log?.log 'Smackbone Live: notification:', method, params
+			switch method
+				when 'smackbone.event'
+					@trigger params.url, params.data, this
+				else
+					functionName = "on_#{method}"
+					@_callMethod functionName, params, (err, result) ->
