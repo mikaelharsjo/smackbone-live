@@ -266,9 +266,9 @@
       }
       if (object.jsonrpc !== '2.0') {
         if ((ref1 = this.log) != null) {
-          ref1.warn('Invalid JsonRpc 2.0 object:', object);
+          ref1.warn('Smackbone Live: Invalid Json Rpc object:', object);
         }
-        throw new Error('Invalid Json Rpc object');
+        throw new Error('Smackbone Live: Invalid Json Rpc object');
       }
       if (object.method != null) {
         if (object.id) {
@@ -306,8 +306,8 @@
       }
       response = {
         id: id,
-        error: err,
-        result: result
+        error: err != null ? err : null,
+        result: result != null ? result : null
       };
       return this._send(response);
     };

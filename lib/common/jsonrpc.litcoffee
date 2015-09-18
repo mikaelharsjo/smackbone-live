@@ -37,8 +37,8 @@ JsonRpc 2.0 Handlers
 			@log?.log 'Smackbone Live: SendResponse:', id, err, result
 			response =
 				id: id
-				error: err
-				result: result
+				error: err ? null
+				result: result ? null
 			@_send response
 
 		sendRequest: (method, params, done) ->
