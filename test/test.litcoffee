@@ -27,7 +27,7 @@
 
 			new smackbone_live.Connection options, (err, connection) ->
 				options.connection.on 'send', (o) ->
-					options.connection.trigger 'object', {reply_to:o.messageId, data: {name:"some name"}}
+					options.connection.trigger 'object', {jsonrpc:'2.0', id:o.id, result: {name:"some name"}}
 
 				connection.command 'some_command', {meaning:42}, (err, reply) ->
 					reply.should.eql {name: 'some name'}

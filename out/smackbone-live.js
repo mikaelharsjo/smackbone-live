@@ -28,10 +28,14 @@
       this._onError = bind(this._onError, this);
       this._onDisconnect = bind(this._onDisconnect, this);
       this._onConnect = bind(this._onConnect, this);
-      this._onMessage = bind(this._onMessage, this);
       this._onObject = bind(this._onObject, this);
+      this._onMessage = bind(this._onMessage, this);
       this._onLocalSaveRequest = bind(this._onLocalSaveRequest, this);
       this._onSaveRequest = bind(this._onSaveRequest, this);
+      this.jsonrpc = new SmackboneLive.JsonRpc({
+        target: this,
+        log: options.log
+      });
       this.connection = options.connection;
       this.repository = options.repository;
       this.log = options.log;
@@ -41,8 +45,6 @@
       if (this.listenToEvent != null) {
         this.listenToEvent.on('all', this._onAll);
       }
-      this.messageQueue = {};
-      this.messageId = 0;
       this.local.on('save_request', this._onLocalSaveRequest);
       this.connection.on('message', this._onMessage);
       this.connection.on('object', this._onObject);
@@ -53,19 +55,25 @@
     }
 
     Connection.prototype._onAll = function(url, data) {
-      return this._send({
-        type: 'event',
+      data = {
         url: url,
         data: data
-      });
+      };
+      return this.jsonrpc.sendNotification('smackbone.event', data);
     };
 
     Connection.prototype._sendModel = function(domain, path, model) {
-      return this._send({
-        type: 'save',
+      var data;
+      data = {
         url: path,
         data: model,
         domain: domain
+      };
+      return this.jsonrpc.sendRequest('smackbone.save', data, function(err) {
+        var ref;
+        if (err != null) {
+          return (ref = this.log) != null ? ref.warn('Smackbone-Live: Save returned error:', data) : void 0;
+        }
       });
     };
 
@@ -103,19 +111,8 @@
       this.commandReceiver = commandReceiver;
     };
 
-    Connection.prototype.command = function(url, data, done) {
-      var queueItem;
-      this.messageId += 1;
-      queueItem = {
-        callback: done
-      };
-      this.messageQueue[this.messageId] = queueItem;
-      return this._send({
-        type: 'command',
-        messageId: this.messageId,
-        url: url,
-        data: data
-      });
+    Connection.prototype.command = function(url, params, done) {
+      return this.jsonrpc.sendRequest(url, params, done);
     };
 
     Connection.prototype.model = function(url) {
@@ -128,29 +125,6 @@
       return model;
     };
 
-    Connection.prototype._sendReply = function(messageId, err, data) {
-      var reply;
-      reply = {
-        err: err,
-        reply_to: messageId,
-        data: data
-      };
-      return this._send(reply);
-    };
-
-    Connection.prototype._send = function(object) {
-      var ref, string;
-      if (this.isConnected()) {
-        if ((ref = this.log) != null) {
-          ref.log('Smackbone Live: Send:', object);
-        }
-        string = JSON.stringify(object);
-        return this.connection.send(string);
-      } else {
-        return console.warn("Couldn't send. Connection is not open:", object);
-      }
-    };
-
     Connection.prototype._onSaveRequest = function(path, model) {
       return this._sendModel('', path, model);
     };
@@ -159,67 +133,40 @@
       return this._sendModel('local', path, model);
     };
 
-    Connection.prototype._onReply = function(messageId, err, data) {
-      var message;
-      message = this.messageQueue[messageId];
-      if (message == null) {
-        return console.warn("Got confirmation on unknown message " + messageId);
-      } else {
-        message.callback(err, data);
-        return delete this.messageQueue[messageId];
-      }
-    };
-
-    Connection.prototype._onSave = function(object) {
+    Connection.prototype._onSave = function(object, done) {
       var domain, model;
       domain = object.domain === 'local' ? this.local : this.repository;
       model = object.url === '' ? domain : domain.get(object.url);
-      return model != null ? model.set(object.data, {
-        triggerRemove: true
-      }) : void 0;
+      if (model != null) {
+        model.set(object.data, {
+          triggerRemove: true
+        });
+      }
+      return done(null);
     };
 
-    Connection.prototype._onCommand = function(object) {
-      var functionName, method;
-      functionName = "_" + object.url;
+    Connection.prototype._callMethod = function(functionName, params, done) {
+      var errorMessage, method, ref;
       method = this.commandReceiver[functionName];
       if (method != null) {
-        return method.call(this.commandReceiver, object.data, (function(_this) {
-          return function(err, reply) {
-            _this._sendReply(object.message_id, err, reply);
-            if ((err != null ? err.status : void 0) < 0) {
-              return _this.close();
-            }
-          };
-        })(this));
+        return method.call(this.commandReceiver, params, done);
       } else {
-        return console.warn("Unknown function '" + functionName + "'");
-      }
-    };
-
-    Connection.prototype._onObject = function(object) {
-      var ref;
-      if ((ref = this.log) != null) {
-        ref.log('Smackbone Live: Incoming:', object);
-      }
-      if (object.reply_to != null) {
-        return this._onReply(object.reply_to, object.err, object.data);
-      } else {
-        switch (object.type) {
-          case 'save':
-            return this._onSave(object);
-          case 'command':
-            return this._onCommand(object);
-          case 'event':
-            return this.trigger(object.url, object.data, this);
+        errorMessage = "Unknown function '" + functionName + "'";
+        if ((ref = this.log) != null) {
+          ref.warn(errorMessage);
         }
+        return done(new Error(errorMessage));
       }
     };
 
     Connection.prototype._onMessage = function(event) {
       var object;
       object = JSON.parse(event);
-      return this._onObject(object);
+      return this.jsonrpc.onObject(object);
+    };
+
+    Connection.prototype._onObject = function(object) {
+      return this.jsonrpc.onObject(object);
     };
 
     Connection.prototype._onConnect = function(event) {
@@ -248,9 +195,155 @@
       return this.trigger('error', this);
     };
 
+    Connection.prototype._onNormalRequest = function(method, params, done) {
+      var functionName;
+      functionName = "_" + object.url;
+      return this._callMethod(functionName, object.data, function(err, result) {
+        done(err, result);
+        if ((err != null ? err.status : void 0) < 0) {
+          return this.close();
+        }
+      });
+    };
+
+    Connection.prototype._send = function(object) {
+      var ref, ref1, string;
+      if (this.isConnected()) {
+        if ((ref = this.log) != null) {
+          ref.log('Smackbone Live: Send:', object);
+        }
+        string = JSON.stringify(object);
+        return this.connection.send(string);
+      } else {
+        return (ref1 = this.log) != null ? ref1.warn("Smackbone Live: Couldn't send. Connection is not open:", object) : void 0;
+      }
+    };
+
+    Connection.prototype._onRequest = function(method, params, done) {
+      var ref;
+      if ((ref = this.log) != null) {
+        ref.log('Smackbone Live: request:', method, params);
+      }
+      switch (method) {
+        case 'smackbone.save':
+          return this._onSave(params, done);
+        default:
+          return this._onNormalRequest(method, params, done);
+      }
+    };
+
+    Connection.prototype._onNotification = function(method, params) {
+      var functionName, ref;
+      if ((ref = this.log) != null) {
+        ref.log('Smackbone Live: notification:', method, params);
+      }
+      switch (method) {
+        case 'smackbone.event':
+          return this.trigger(params.url, params.data, this);
+        default:
+          functionName = "on_" + method;
+          return this._callMethod(functionName, params, function(err, result) {});
+      }
+    };
+
     return Connection;
 
   })(Smackbone.Event);
+
+  SmackboneLive.JsonRpc = (function() {
+    function JsonRpc(options) {
+      this.onObject = bind(this.onObject, this);
+      this.target = options.target;
+      this.log = options.log;
+      this.messageQueue = {};
+      this.messageId = 0;
+    }
+
+    JsonRpc.prototype.onObject = function(object) {
+      var ref, ref1;
+      if ((ref = this.log) != null) {
+        ref.log('Smackbone Live: onObject:', object);
+      }
+      if (object.jsonrpc !== '2.0') {
+        if ((ref1 = this.log) != null) {
+          ref1.warn('Invalid JsonRpc 2.0 object:', object);
+        }
+        throw new Error('Invalid Json Rpc object');
+      }
+      if (object.method != null) {
+        if (object.id) {
+          return this.target._onRequest(object.method, object.params, (function(_this) {
+            return function(err, result) {
+              return _this._sendResponse(object.id, err, result);
+            };
+          })(this));
+        } else {
+          return this.target._onNotification(object.method, object.params);
+        }
+      } else {
+        return this._onResponse(object.id, object.error, object.result);
+      }
+    };
+
+    JsonRpc.prototype._onResponse = function(id, err, result) {
+      var message, ref, ref1;
+      if ((ref = this.log) != null) {
+        ref.log('Smackbone Live: onResponse:', id, err, result);
+      }
+      message = this.messageQueue[id];
+      if (message == null) {
+        return (ref1 = this.log) != null ? ref1.warn("Got confirmation on unknown message " + id) : void 0;
+      } else {
+        message.callback(err, result);
+        return delete this.messageQueue[id];
+      }
+    };
+
+    JsonRpc.prototype._sendResponse = function(id, err, result) {
+      var ref, response;
+      if ((ref = this.log) != null) {
+        ref.log('Smackbone Live: SendResponse:', id, err, result);
+      }
+      response = {
+        id: id,
+        error: err,
+        result: result
+      };
+      return this._send(response);
+    };
+
+    JsonRpc.prototype.sendRequest = function(method, params, done) {
+      var queueItem, request;
+      this.messageId += 1;
+      queueItem = {
+        callback: done
+      };
+      this.messageQueue[this.messageId] = queueItem;
+      request = {
+        id: this.messageId,
+        method: method,
+        params: params
+      };
+      return this._send(request);
+    };
+
+    JsonRpc.prototype.sendNotification = function(method, params) {
+      var notification;
+      notification = {
+        method: method,
+        params: params
+      };
+      return this._send(notification);
+    };
+
+    JsonRpc.prototype._send = function(data) {
+      data.jsonrpc = '2.0';
+      return this.target._send(data);
+    };
+
+    return JsonRpc;
+
+  })();
 
   SmackboneLive.WebsocketConnection = (function(superClass) {
     extend(WebsocketConnection, superClass);
