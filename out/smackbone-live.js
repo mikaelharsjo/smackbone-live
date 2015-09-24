@@ -266,9 +266,9 @@
       }
       if (object.jsonrpc !== '2.0') {
         if ((ref1 = this.log) != null) {
-          ref1.warn('Invalid JsonRpc 2.0 object:', object);
+          ref1.warn('Smackbone Live: Invalid Json Rpc object:', object);
         }
-        throw new Error('Invalid Json Rpc object');
+        throw new Error('Smackbone Live: Invalid Json Rpc object');
       }
       if (object.method != null) {
         if (object.id) {
@@ -391,6 +391,114 @@
     };
 
     return WebsocketConnection;
+
+  })(Smackbone.Event);
+
+  SmackboneLive.WebsocketReConnection = (function(superClass) {
+    extend(WebsocketReConnection, superClass);
+
+    function WebsocketReConnection(host, socketFactory, log) {
+      this.host = host;
+      this.socketFactory = socketFactory;
+      this.log = log;
+      this._onDisconnect = bind(this._onDisconnect, this);
+      this._onError = bind(this._onError, this);
+      this._onRetryConnection = bind(this._onRetryConnection, this);
+      this._onConnect = bind(this._onConnect, this);
+      this._onObject = bind(this._onObject, this);
+      this._onMessage = bind(this._onMessage, this);
+    }
+
+    WebsocketReConnection.prototype.connect = function() {
+      var connection, ref;
+      if ((ref = this.log) != null) {
+        ref.log('Smackbone Live:Reconnection: Connecting...');
+      }
+      this.readyState = 0;
+      connection = this.socketFactory(this.host);
+      connection.on('message', this._onMessage);
+      connection.on('object', this._onObject);
+      connection.on('open', this._onConnect);
+      connection.on('close', this._onDisconnect);
+      connection.on('error', this._onError);
+      connection.connect();
+      return this.connection = connection;
+    };
+
+    WebsocketReConnection.prototype.send = function(data) {
+      var ref;
+      if ((ref = this.log) != null) {
+        ref.log('Smackbone Live:Reconnection: Sending:', data);
+      }
+      return this.connection.send(data);
+    };
+
+    WebsocketReConnection.prototype.close = function() {
+      var ref;
+      if ((ref = this.log) != null) {
+        ref.log('Smackbone Live:Reconnection: Closing...');
+      }
+      this.connection.close();
+      if (this.timer != null) {
+        return clearTimeout(this.timer);
+      }
+    };
+
+    WebsocketReConnection.prototype._onMessage = function(event) {
+      return this.trigger('message', event);
+    };
+
+    WebsocketReConnection.prototype._onObject = function(object) {
+      return this.trigger('object', event);
+    };
+
+    WebsocketReConnection.prototype._onConnect = function(event) {
+      var ref;
+      if ((ref = this.log) != null) {
+        ref.log('Smackbone Live:Reconnection: Connected');
+      }
+      return this.trigger('open', this);
+    };
+
+    WebsocketReConnection.prototype._onRetryConnection = function() {
+      var ref;
+      this.timer = void 0;
+      if ((ref = this.log) != null) {
+        ref.log('Smackbone Live:Reconnection: Reconnecting...');
+      }
+      this.connection = void 0;
+      return this.connect();
+    };
+
+    WebsocketReConnection.prototype._onError = function(err) {
+      var ref;
+      if ((ref = this.log) != null) {
+        ref.log('Smackbone Live:Reconnection: OnError:', err);
+      }
+      return this._tryReconnect();
+    };
+
+    WebsocketReConnection.prototype._onDisconnect = function(event) {
+      var ref;
+      if ((ref = this.log) != null) {
+        ref.log('Smackbone Live:Reconnection: Disconnected');
+      }
+      this.trigger('close', this);
+      return this._tryReconnect();
+    };
+
+    WebsocketReConnection.prototype._tryReconnect = function() {
+      var ref;
+      if (this.timer != null) {
+        if ((ref = this.log) != null) {
+          ref.log('Smackbone Live:Reconnection: Already reconnecting...');
+        }
+        return;
+      }
+      return this.timer = setTimeout(this._onRetryConnection, 1000);
+    };
+
+    return WebsocketReConnection;
 
   })(Smackbone.Event);
 
