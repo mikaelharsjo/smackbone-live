@@ -21,6 +21,7 @@ module.exports = (grunt) ->
 					'lib/common/connection.litcoffee'
 					'lib/common/jsonrpc.litcoffee'
 					'lib/websocket/connection.litcoffee'
+					'lib/websocket/reconnection.litcoffee'
 				]
 				dest: 'out/smackbone-live.litcoffee'
 
