@@ -306,8 +306,8 @@
       }
       response = {
         id: id,
-        error: err,
-        result: result
+        error: err != null ? err : null,
+        result: result != null ? result : null
       };
       return this._send(response);
     };
@@ -454,6 +454,7 @@
 
     WebsocketReConnection.prototype._onConnect = function(event) {
       var ref;
+      this.readyState = 1;
       if ((ref = this.log) != null) {
         ref.log('Smackbone Live:Reconnection: Connected');
       }
@@ -463,6 +464,7 @@
     WebsocketReConnection.prototype._onRetryConnection = function() {
       var ref;
       this.timer = void 0;
+      this.readyState = 0;
       if ((ref = this.log) != null) {
         ref.log('Smackbone Live:Reconnection: Reconnecting...');
       }
@@ -489,6 +491,7 @@
 
     WebsocketReConnection.prototype._tryReconnect = function() {
       var ref;
+      this.readyState = 2;
       if (this.timer != null) {
         if ((ref = this.log) != null) {
           ref.log('Smackbone Live:Reconnection: Already reconnecting...');
