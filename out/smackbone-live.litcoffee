@@ -292,11 +292,13 @@ JsonRpc 2.0 Handlers
 			@trigger 'object', event
 
 		_onConnect: (event) =>
+			@readyState = 1
 			@log?.log 'Smackbone Live:Reconnection: Connected'
 			@trigger 'open', this
 
 		_onRetryConnection: =>
 			@timer = undefined
+			@readyState = 0
 			@log?.log 'Smackbone Live:Reconnection: Reconnecting...'
 			@connection = undefined
 			@connect()
@@ -311,6 +313,7 @@ JsonRpc 2.0 Handlers
 			@_tryReconnect()
 
 		_tryReconnect: ->
+			@readyState = 2
 			if @timer?
 				@log?.log 'Smackbone Live:Reconnection: Already reconnecting...'
 				return
