@@ -367,6 +367,10 @@
       return this.connection = connection;
     };
 
+    WebsocketConnection.prototype.close = function() {
+      return this.connection.close();
+    };
+
     WebsocketConnection.prototype.send = function(string) {
       return this.connection.send(string);
     };

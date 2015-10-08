@@ -243,6 +243,9 @@ JsonRpc 2.0 Handlers
 			connection.onmessage = @_onMessage
 			@connection = connection
 
+		close: ->
+			@connection.close()
+
 		send: (string) ->
 			@connection.send string
 

@@ -11,6 +11,9 @@
 			connection.onmessage = @_onMessage
 			@connection = connection
 
+		close: ->
+			@connection.close()
+
 		send: (string) ->
 			@connection.send string
 
