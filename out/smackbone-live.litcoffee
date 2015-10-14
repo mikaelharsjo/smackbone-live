@@ -266,6 +266,7 @@ JsonRpc 2.0 Handlers
 
 	class SmackboneLive.WebsocketReConnection extends Smackbone.Event
 		constructor: (@host, @socketFactory, @log) ->
+			@closeRequested = false
 
 		connect: ->
 			@log?.log 'Smackbone Live:Reconnection: Connecting...'
@@ -285,8 +286,9 @@ JsonRpc 2.0 Handlers
 
 		close: ->
 			@log?.log 'Smackbone Live:Reconnection: Closing...'
-			@connection.close()
+			@closeRequested = true
 			clearTimeout @timer if @timer?
+			@connection.close()
 
 		_onMessage: (event) =>
 			@trigger 'message', event
@@ -308,12 +310,12 @@ JsonRpc 2.0 Handlers
 
 		_onError: (err) =>
 			@log?.log 'Smackbone Live:Reconnection: OnError:', err
-			@_tryReconnect()
+			@_tryReconnect() if not @closeRequested
 
 		_onDisconnect: (event) =>
 			@log?.log 'Smackbone Live:Reconnection: Disconnected'
 			@trigger 'close', this
-			@_tryReconnect()
+			@_tryReconnect() if not @closeRequested
 
 		_tryReconnect: ->
 			@readyState = 2

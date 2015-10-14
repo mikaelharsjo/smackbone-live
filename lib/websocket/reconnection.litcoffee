@@ -1,6 +1,7 @@
 
 	class SmackboneLive.WebsocketReConnection extends Smackbone.Event
 		constructor: (@host, @socketFactory, @log) ->
+			@closeRequested = false
 
 		connect: ->
 			@log?.log 'Smackbone Live:Reconnection: Connecting...'
@@ -20,8 +21,9 @@
 
 		close: ->
 			@log?.log 'Smackbone Live:Reconnection: Closing...'
-			@connection.close()
+			@closeRequested = true
 			clearTimeout @timer if @timer?
+			@connection.close()
 
 		_onMessage: (event) =>
 			@trigger 'message', event
@@ -43,12 +45,12 @@
 
 		_onError: (err) =>
 			@log?.log 'Smackbone Live:Reconnection: OnError:', err
-			@_tryReconnect()
+			@_tryReconnect() if not @closeRequested
 
 		_onDisconnect: (event) =>
 			@log?.log 'Smackbone Live:Reconnection: Disconnected'
 			@trigger 'close', this
-			@_tryReconnect()
+			@_tryReconnect() if not @closeRequested
 
 		_tryReconnect: ->
 			@readyState = 2

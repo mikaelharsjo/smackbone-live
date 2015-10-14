@@ -411,6 +411,7 @@
       this._onConnect = bind(this._onConnect, this);
       this._onObject = bind(this._onObject, this);
       this._onMessage = bind(this._onMessage, this);
+      this.closeRequested = false;
     }
 
     WebsocketReConnection.prototype.connect = function() {
@@ -442,10 +443,11 @@
       if ((ref = this.log) != null) {
         ref.log('Smackbone Live:Reconnection: Closing...');
       }
-      this.connection.close();
+      this.closeRequested = true;
       if (this.timer != null) {
-        return clearTimeout(this.timer);
+        clearTimeout(this.timer);
       }
+      return this.connection.close();
     };
 
     WebsocketReConnection.prototype._onMessage = function(event) {
@@ -481,7 +483,9 @@
       if ((ref = this.log) != null) {
         ref.log('Smackbone Live:Reconnection: OnError:', err);
       }
-      return this._tryReconnect();
+      if (!this.closeRequested) {
+        return this._tryReconnect();
+      }
     };
 
     WebsocketReConnection.prototype._onDisconnect = function(event) {
@@ -490,7 +494,9 @@
         ref.log('Smackbone Live:Reconnection: Disconnected');
       }
       this.trigger('close', this);
-      return this._tryReconnect();
+      if (!this.closeRequested) {
+        return this._tryReconnect();
+      }
     };
 
     WebsocketReConnection.prototype._tryReconnect = function() {
