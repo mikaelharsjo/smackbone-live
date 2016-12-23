@@ -1,6 +1,6 @@
 
 	class SmackboneLive.WebsocketConnection extends Smackbone.Event
-		constructor: (@host) ->
+		constructor: (@host, @log) ->
 
 		connect: ->
 			@readyState = 0
@@ -29,5 +29,5 @@
 			@trigger 'close', this
 
 		_onError: (error) =>
-			console.error 'we have a error:', error
+			@log?.log 'we have a error:', error
 			@trigger 'error', this
